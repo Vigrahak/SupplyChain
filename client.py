@@ -4,7 +4,7 @@ import subprocess
 import re
 import tqdm
 
-SERVER_HOST = '192.168.1.41'
+SERVER_HOST = '192.168.18.128'
 SERVER_PORT = 8000
 BUFFER_SIZE = 1440  # max size of messages
 SEPARATOR = "<sep>"  # separator string for sending 2 messages in one go
