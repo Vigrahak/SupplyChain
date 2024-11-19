@@ -1,15 +1,10 @@
 import socket
 import os
 import subprocess
-import sys
 import re
-import platform
-from datetime import datetime
-
 import tqdm
-import psutil
 
-SERVER_HOST = '192.168.18.128'
+SERVER_HOST = '192.168.1.41'
 SERVER_PORT = 8000
 BUFFER_SIZE = 1440  # max size of messages
 SEPARATOR = "<sep>"  # separator string for sending 2 messages in one go
