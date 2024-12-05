@@ -6,7 +6,7 @@ import re
 import tqdm
 import urllib.parse
 
-SERVER_HOST = '192.168.1.41'
+SERVER_HOST = '192.168.18.128'
 SERVER_PORT = 8000
 BUFFER_SIZE = 1440
 SEPARATOR = "<sep>"
