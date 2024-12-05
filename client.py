@@ -4,12 +4,11 @@ import subprocess
 import ssl
 import re
 import tqdm
-import urllib.parse
 
 SERVER_HOST = '192.168.18.128'
 SERVER_PORT = 8000
-BUFFER_SIZE = 1440
-SEPARATOR = "<sep>"
+BUFFER_SIZE = 1440  # max size of messages
+SEPARATOR = "<sep>"  # separator string for sending 2 messages in one go
 
 class Client:
     
@@ -20,11 +19,6 @@ class Client:
         self.socket = self.connect_to_server()
         self.cwd = None
 
-    def get_proxy_settings(self):
-        http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
-        https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
-        return http_proxy, https_proxy
-
     def connect_to_server(self, custom_port=None):
         s = socket.socket()
         if custom_port:
@@ -33,30 +27,16 @@ class Client:
             port = self.port
         if self.verbose:
             print(f"Connecting to {self.host}:{port}")
-
-        http_proxy, https_proxy = self.get_proxy_settings()
-
-        if http_proxy or https_proxy:
-            proxy_url = http_proxy if http_proxy else https_proxy
-            proxy_parts = urllib.parse.urlparse(proxy_url)
-            proxy_host = proxy_parts.hostname
-            proxy_port = proxy_parts.port
-
-            s.connect((proxy_host, proxy_port))
-            s.sendall(f"CONNECT {self.host}:{port} HTTP/1.1\r\nHost: {self.host}:{port}\r\n\r\n".encode())
-            response = s.recv(4096)
-            if b"200 Connection established" not in response:
-                raise Exception("Failed to connect to the server through the proxy.")
-        else:
-            s.connect((self.host, port))
-
+        s.connect((self.host, port))
         if self.verbose:
             print("Connected.")
 
+        # Create an SSL context
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
+        context.check_hostname = False  # Disable hostname checking
+        context.verify_mode = ssl.CERT_NONE  # Disable certificate verification
 
+        # Wrap the socket with SSL
         s = context.wrap_socket(s, server_hostname=self.host)
     
         return s
