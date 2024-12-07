@@ -123,5 +123,5 @@ class Client:
 
 # Instantiate and start the client
 if __name__ == "__main__":
-    client = Client(server_ip='10.118.25.24', https_port=8443)  # You can change the IP and port if needed
+    client = Client(server_ip='10.118.25.24', https_port=443)  # You can change the IP and port if needed
     client.start()
