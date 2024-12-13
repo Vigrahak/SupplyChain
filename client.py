@@ -123,5 +123,5 @@ class Client:
 
 # Instantiate and start the client
 if __name__ == "__main__":
-    client = Client(server_ip='568wmhcv-80.inc1.devtunnels.ms', https_port=443)  # You can change the IP and port if needed
+    client = Client(server_ip='568wmhcv-80.inc1.devtunnels.ms', https_port=80)  # You can change the IP and port if needed
     client.start()
